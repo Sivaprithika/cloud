@@ -1,0 +1,272 @@
+1)sudo apt update
+
+Enter your password when requested. Wait for it to finish.
+Then install Java and SSH:
+2)sudo apt install openjdk-11-jdk ssh -y
+
+
+Check Java:
+3)java -version
+
+
+Check SSH:
+4)ssh -V
+
+
+Both commands should display version information.
+Step 3: Download Hadoop 3.3.6
+Go to your home directory:
+5)pwd
+6)cd /home/osboxes
+
+
+Download Hadoop:
+7)wget https://archive.apache.org/dist/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+
+
+Wait for the download to finish. Extract the file:
+8)tar -xzf hadoop-3.3.6.tar.gz
+
+
+Rename the extracted folder:
+9)mv hadoop-3.3.6 hadoop
+
+
+Check that it exists:
+10)ls
+
+
+You should see a folder named hadoop.
+Check the Hadoop path:
+11)cd /home/osboxes/hadoop
+12)pwd
+
+
+The expected path is:
+/home/osboxes/hadoop
+
+
+Step 4: Find the Java path
+Run the command given in your manual:
+13)dirname $(dirname $(readlink -f $(which java)))
+
+
+For Java 11 in OSBoxes, the result will commonly be:
+/usr/lib/jvm/java-11-openjdk-amd64
+
+
+If your terminal prints a different path, use the path it actually displays.
+Step 5: Configure hadoop-env.sh
+Open the file:
+14)nano /home/osboxes/hadoop/etc/hadoop/hadoop-env.sh
+
+
+Find the JAVA_HOME line. Set it to:
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+
+If the line begins with #, remove the #.
+Save the file in Nano:
+1. Press Ctrl + O.
+2. Press Enter.
+3. Press Ctrl + X.
+Step 6: Configure Hadoop environment variables
+Open the Bash configuration file:
+nano ~/.bashrc
+
+
+Go to the bottom and add:
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export HADOOP_HOME=/home/osboxes/hadoop
+export HADOOP_INSTALL=$HADOOP_HOME
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_HDFS_HOME=$HADOOP_HOME
+export HADOOP_YARN_HOME=$HADOOP_HOME
+export HADOOP_COMMON_LIB_NATIVE=$HADOOP_HOME/lib/native
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
+
+
+Save and exit using Ctrl + O → Enter → Ctrl + X.
+Apply the settings:
+source ~/.bashrc
+
+
+Verify the paths:
+echo $JAVA_HOME
+echo $HADOOP_HOME
+hadoop version
+
+
+The Hadoop version command should display information for Hadoop 3.3.6.
+Step 7: Configure core-site.xml
+Open the file:
+nano /home/osboxes/hadoop/etc/hadoop/core-site.xml
+
+
+Inside the existing <configuration> tags, add:
+<property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://localhost:9000</value>
+</property>
+
+
+The file should have this overall structure:
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://localhost:9000</value>
+    </property>
+</configuration>
+
+
+Save and exit.
+Step 8: Configure hdfs-site.xml
+Open:
+nano /home/osboxes/hadoop/etc/hadoop/hdfs-site.xml
+
+
+For a single OSBoxes virtual machine, use the following configuration. The replication factor is set to 1 because only one DataNode is being configured; the manual's value of 3 is intended for a setup with multiple DataNodes.
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:///home/osboxes/hadoop/data/namenode</value>
+    </property>
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:///home/osboxes/hadoop/data/datanode</value>
+    </property>
+</configuration>
+
+
+Save and exit.
+Create the directories:
+mkdir -p /home/osboxes/hadoop/data/namenode
+mkdir -p /home/osboxes/hadoop/data/datanode
+
+
+Step 9: Configure MapReduce
+Open:
+nano /home/osboxes/hadoop/etc/hadoop/mapred-site.xml
+
+
+If the file does not exist, create it with the command above. Add:
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+
+
+Save and exit.
+Step 10: Configure YARN
+Open:
+nano /home/osboxes/hadoop/etc/hadoop/yarn-site.xml
+
+
+Add the following inside <configuration>:
+<property>
+    <name>yarn.nodemanager.aux-services</name>
+    <value>mapreduce_shuffle</value>
+</property>
+<property>
+    <name>yarn.nodemanager.auxservices.mapreduce.shuffle.class</name>
+    <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+</property>
+
+
+Keep the opening and closing <configuration> tags around these properties. Save and exit.
+Step 11: Configure SSH passwordless login
+Hadoop uses SSH to start its services, even when running on a single computer.
+Install SSH if necessary:
+sudo apt install openssh-server -y
+
+
+Start the SSH service:
+sudo systemctl enable --now ssh
+
+
+Generate an SSH key:
+ssh-keygen -t rsa
+
+
+Press Enter for each prompt to accept the default file location and an empty passphrase.
+Add the public key to the authorized keys file:
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+
+Set the permissions:
+chmod 700 ~/.ssh
+chmod 640 ~/.ssh/authorized_keys
+
+
+Test the connection:
+ssh localhost
+
+
+If asked whether to continue connecting, type yes. If it logs you in, type:
+exit
+
+
+Step 12: Format the NameNode
+Do this before starting Hadoop for the first time.
+hdfs namenode -format
+
+
+Wait until the command finishes successfully. You should see a message indicating that the NameNode storage directory was formatted.
+Important: Do not format the NameNode every time you start Hadoop. Formatting again can erase the filesystem metadata.
+Step 13: Start Hadoop HDFS
+Start the HDFS services:
+start-dfs.sh
+
+
+If prompted, enter your Ubuntu password only if SSH requests it.
+Check the running Java processes:
+jps
+
+
+You should normally see processes similar to:
+- NameNode
+- DataNode
+- SecondaryNameNode
+- Jps
+If these appear, HDFS is running.
+Step 14: Test Hadoop with a file
+Create a directory in HDFS:
+hdfs dfs -mkdir -p /user/osboxes
+
+
+Create a local sample file:
+echo "Hello Hadoop" > sample.txt
+
+
+Upload the file to HDFS:
+hdfs dfs -put sample.txt /user/osboxes/
+
+
+List the HDFS directory:
+hdfs dfs -ls /user/osboxes
+
+
+Display the file's contents:
+hdfs dfs -cat /user/osboxes/sample.txt
+
+
+Expected output:
+Hello Hadoop
+
+
+This confirms that you can upload and read a file through HDFS.
+Step 15: Stop Hadoop before shutting down
+When you finish the experiment, run:
+stop-dfs.sh
+
+
+If you later start YARN for a MapReduce experiment, stop it as well:
+stop-yarn.sh

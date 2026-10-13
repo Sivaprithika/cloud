@@ -1,0 +1,9 @@
+npm.cmd install -g firebase-tools
+
+firebase.cmd --version
+
+firebase.cmd login
+
+firebase.cmd init hosting
+
+firebase.cmd deploy --only hosting

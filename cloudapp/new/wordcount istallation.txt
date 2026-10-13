@@ -1,0 +1,220 @@
+# HADOOP WORDCOUNT PROGRAM EXECUTION USING UBUNTU WSL
+
+## 1. AIM
+
+To execute the WordCount MapReduce program using Hadoop 3.5.0 in Ubuntu WSL and count the occurrences of each word in a text file stored in HDFS.
+
+## 2. REQUIREMENTS
+
+* Windows with Ubuntu WSL
+* Hadoop 3.5.0 installed and configured
+* Java JDK 17
+* HDFS configured and formatted
+* SSH service configured
+* Internet connection is not required once everything is installed
+
+## 3. PROCEDURE
+
+### STEP 1: START THE SSH SERVICE
+
+Open the Ubuntu WSL terminal and execute:
+
+```bash
+sudo service ssh start
+```
+
+**Explanation:** Starts the SSH service required by Hadoop's local startup scripts.
+
+### STEP 2: START HADOOP HDFS
+
+Execute:
+
+```bash
+start-dfs.sh
+```
+
+Check the running Hadoop processes:
+
+```bash
+jps
+```
+
+**Expected process names:**
+
+```text
+NameNode
+DataNode
+SecondaryNameNode
+Jps
+```
+
+The process IDs will differ on your computer.
+
+**Explanation:**
+
+* NameNode manages HDFS metadata.
+* DataNode stores file data.
+* SecondaryNameNode assists with checkpointing NameNode metadata.
+* Jps displays running Java processes.
+
+**Note:** Do not run `hdfs namenode -format` again. The NameNode has already been formatted during installation.
+
+### STEP 3: CREATE THE INPUT DIRECTORY IN HDFS
+
+Execute:
+
+```bash
+hdfs dfs -mkdir -p /user/$USER/input
+```
+
+Verify the directory:
+
+```bash
+hdfs dfs -ls /user/$USER
+```
+
+**Explanation:** Creates an `input` directory in HDFS to store the text file used by the WordCount program.
+
+### STEP 4: CREATE THE INPUT TEXT FILE
+
+Execute the following complete command:
+
+```bash
+cat > ~/wordcount.txt <<'EOF'
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+EOF
+```
+
+Display the contents:
+
+```bash
+cat ~/wordcount.txt
+```
+
+**Expected output:**
+
+```text
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+```
+
+**Explanation:** Creates a local text file containing four lines. Hadoop will count each word in this file.
+
+### STEP 5: UPLOAD THE FILE TO HDFS
+
+Execute:
+
+```bash
+hdfs dfs -put ~/wordcount.txt /user/$USER/input/
+```
+
+Verify that the file has been uploaded:
+
+```bash
+hdfs dfs -ls /user/$USER/input
+```
+
+**Expected result:** The listing contains `wordcount.txt`.
+
+View the file stored in HDFS:
+
+```bash
+hdfs dfs -cat /user/$USER/input/wordcount.txt
+```
+
+**Explanation:** The `-put` command transfers the local file into Hadoop Distributed File System (HDFS).
+
+### STEP 6: EXECUTE THE WORDCOUNT MAPREDUCE PROGRAM
+
+Execute the following command:
+
+```bash
+hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar wordcount /user/$USER/input /user/$USER/output
+```
+
+**Explanation of the command:**
+
+* `hadoop jar` executes a Hadoop program packaged in a JAR file.
+* `hadoop-mapreduce-examples-3.5.0.jar` contains Hadoop's example MapReduce programs.
+* `wordcount` specifies the program to execute.
+* `/user/$USER/input` is the HDFS input directory.
+* `/user/$USER/output` is the HDFS output directory.
+
+**Important:** The output directory must not already exist. If the program has been executed previously, remove the old output directory before running the command again.
+
+```bash
+hdfs dfs -rm -r /user/$USER/output
+```
+
+Run the WordCount command again after removing the old output directory.
+
+### STEP 7: DISPLAY THE WORDCOUNT RESULTS
+
+After the MapReduce job completes successfully, execute:
+
+```bash
+hdfs dfs -cat /user/$USER/output/part-r-00000
+```
+
+**Expected output:**
+
+```text
+hadoop  2
+hello   3
+is      1
+linux   1
+useful  1
+world   1
+```
+
+The order of the words may vary.
+
+**Explanation:** The output displays each distinct word and the number of times it occurs in the input file.
+
+### STEP 8: VERIFY THE OUTPUT DIRECTORY
+
+Execute:
+
+```bash
+hdfs dfs -ls /user/$USER/output
+```
+
+To view the result again:
+
+```bash
+hdfs dfs -cat /user/$USER/output/part-r-00000
+```
+
+### STEP 9: STOP HADOOP
+
+After completing the execution, stop HDFS:
+
+```bash
+stop-dfs.sh
+```
+
+**Explanation:** Stops the HDFS services when they are no longer required.
+
+## 4. RESULT
+
+The Hadoop WordCount MapReduce program was executed successfully in Ubuntu WSL. The input text file was uploaded to HDFS, and the program counted the occurrences of each word and stored the results in the HDFS output directory.
+
+## 5. IMPORTANT COMMANDS SUMMARY
+
+| Purpose                | Command                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Start SSH              | `sudo service ssh start`                                                                                                            |
+| Start HDFS             | `start-dfs.sh`                                                                                                                      |
+| Check processes        | `jps`                                                                                                                               |
+| Create input directory | `hdfs dfs -mkdir -p /user/$USER/input`                                                                                              |
+| Upload input file      | `hdfs dfs -put ~/wordcount.txt /user/$USER/input/`                                                                                  |
+| Execute WordCount      | `hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar wordcount /user/$USER/input /user/$USER/output` |
+| Display results        | `hdfs dfs -cat /user/$USER/output/part-r-00000`                                                                                     |
+| Stop HDFS              | `stop-dfs.sh`                                                                                                                       |
+
+**End of procedure.**

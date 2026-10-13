@@ -1,0 +1,79 @@
+Part 2: Tomorrow — set up the lab PC
+
+
+Step 1 — Install Git
+Download from git-scm.com.
+Open a new PowerShell terminal after installation and check:
+git --version
+
+
+
+
+
+
+Step 2 — Install Node.js
+Download the LTS version from nodejs.org.
+Verify:
+node -v
+npm -v
+
+
+
+
+
+
+
+
+Step 3 — Clone your project
+Open PowerShell in the folder where you want the project:
+cd "$HOME\Documents"
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
+
+
+Replace the URL and folder name with your actual GitHub repository details.
+
+
+
+Step 4 — Install the frontend dependencies
+From the project root, run:
+npm install
+
+
+This downloads the packages listed in package.json.
+Step 5 — Set up the backend
+cd backend
+npm install
+
+
+Create a private .env file:
+notepad .env
+
+
+Add your configuration using the current, valid MongoDB Atlas connection string:
+PORT=5000
+MONGODB_URI=YOUR_MONGODB_ATLAS_CONNECTION_STRING
+
+
+Save it. Do not upload this file to GitHub.
+Make sure the lab PC's public IP is permitted under MongoDB Atlas Security → Network Access. Your database user must also have the appropriate database permissions.
+Step 6 — Start the backend
+In the backend terminal:
+node server.js
+
+
+Wait for:
+MongoDB Atlas connected successfully
+Backend server running at http://localhost:5000
+
+
+Test it in the browser:
+Open backend test pageIt should display Cloud File App backend is running!.
+Step 7 — Start the frontend
+Keep the backend running. Open a second PowerShell terminal:
+cd "$HOME\Documents\YOUR_REPOSITORY"
+npm run dev -- --port 5174
+
+
+Open the URL Vite displays, normally:
+Open Cloud File AppSign in and test the features. Firebase and Auth0 must have the correct configuration, and their allowed domains/callback URLs must include the lab PC's local origin where applicable.

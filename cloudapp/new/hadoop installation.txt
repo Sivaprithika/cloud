@@ -1,0 +1,663 @@
+# HADOOP 3.5.0 INSTALLATION AND WORD COUNT ON UBUNTU WSL
+
+## 1. AIM
+
+To install and configure Hadoop 3.5.0 in Ubuntu using Windows Subsystem for Linux (WSL), start HDFS, and execute the WordCount MapReduce program.
+
+## 2. REQUIREMENTS
+
+* Windows with Ubuntu WSL installed
+* Internet connection for downloading packages
+* Java JDK 17
+* Hadoop 3.5.0
+* OpenSSH server and client
+
+**Important:**
+
+* Execute all commands in the Ubuntu/WSL terminal, not Windows Command Prompt or PowerShell.
+* Copy and execute one section at a time.
+* When entering your Ubuntu password, no characters will appear on the screen. This is normal.
+* Hadoop has already been downloaded, configured, and formatted successfully in your setup. Do not repeat the formatting step unnecessarily.
+
+---
+
+## STEP 1: UPDATE UBUNTU
+
+### Commands
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+### Explanation
+
+* `sudo apt update` refreshes the package list.
+* `sudo apt upgrade -y` installs available package updates.
+* `sudo` runs the command with administrator privileges.
+
+---
+
+## STEP 2: INSTALL JAVA AND REQUIRED PACKAGES
+
+### Command
+
+```bash
+sudo apt install openjdk-17-jdk openssh-server openssh-client rsync wget -y
+```
+
+### Check Java installation
+
+```bash
+java -version
+javac -version
+```
+
+### Explanation
+
+* `openjdk-17-jdk` installs Java 17 and the Java compiler.
+* `openssh-server` enables the SSH service.
+* `openssh-client` provides SSH client commands.
+* `rsync` is a file synchronization utility.
+* `wget` downloads files from the internet.
+
+**Expected result:** Java and `javac` should display version 17.
+
+---
+
+## STEP 3: DOWNLOAD HADOOP 3.5.0
+
+Move to the Ubuntu home directory:
+
+```bash
+cd ~
+```
+
+Download Hadoop:
+
+```bash
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz
+```
+
+If the download URL fails, try this alternative:
+
+```bash
+wget https://downloads.apache.org/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz
+```
+
+### Explanation
+
+The `wget` command downloads the Hadoop compressed archive into the current directory.
+
+---
+
+## STEP 4: EXTRACT AND INSTALL HADOOP
+
+Extract the downloaded archive:
+
+```bash
+tar -xzf hadoop-3.5.0.tar.gz
+```
+
+Move the extracted directory:
+
+```bash
+sudo mv hadoop-3.5.0 /usr/local/hadoop
+```
+
+Check the installation directory:
+
+```bash
+ls /usr/local/hadoop
+```
+
+### Explanation
+
+* `tar -xzf` extracts the compressed archive.
+* `/usr/local/hadoop` is the Hadoop installation directory used in this guide.
+
+If the destination already exists, do not overwrite it blindly. Check the existing installation first.
+
+---
+
+## STEP 5: CONFIGURE ENVIRONMENT VARIABLES
+
+Open the Bash configuration file:
+
+```bash
+nano ~/.bashrc
+```
+
+Go to the bottom of the file and add these lines:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export HADOOP_HOME=/usr/local/hadoop
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+```
+
+### Save and exit Nano
+
+1. Press `Ctrl + O`.
+2. Press `Enter`.
+3. Press `Ctrl + X`.
+
+Load the updated environment variables:
+
+```bash
+source ~/.bashrc
+```
+
+### Configure Java for Hadoop
+
+Open the Hadoop environment file:
+
+```bash
+nano $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+```
+
+Find the `JAVA_HOME` setting and set it to:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+If no such line exists, add it.
+
+Save and exit using `Ctrl + O`, `Enter`, and `Ctrl + X`.
+
+### Verify Hadoop
+
+```bash
+hadoop version
+```
+
+**Expected result:** Hadoop version 3.5.0 and Java version information should appear.
+
+---
+
+## STEP 6: CONFIGURE core-site.xml
+
+Open the configuration file:
+
+```bash
+nano $HADOOP_HOME/etc/hadoop/core-site.xml
+```
+
+Replace its contents with:
+
+```xml
+<?xml version="1.0"?>
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://localhost:9000</value>
+    </property>
+</configuration>
+```
+
+Save and exit Nano.
+
+### Explanation
+
+The `fs.defaultFS` property specifies the default Hadoop Distributed File System (HDFS) address.
+
+Here, HDFS is configured to use `localhost` on port `9000`.
+
+---
+
+## STEP 7: CONFIGURE hdfs-site.xml
+
+Open the configuration file:
+
+```bash
+nano $HADOOP_HOME/etc/hadoop/hdfs-site.xml
+```
+
+Replace its contents with:
+
+```xml
+<?xml version="1.0"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+</configuration>
+```
+
+Save and exit Nano.
+
+### Explanation
+
+The `dfs.replication` property specifies how many copies of each HDFS data block should be maintained.
+
+A replication factor of `1` is suitable for a single-computer practice setup.
+
+---
+
+## STEP 8: CONFIGURE SSH
+
+Start the SSH service:
+
+```bash
+sudo service ssh start
+```
+
+Generate an SSH key:
+
+```bash
+ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
+```
+
+If asked whether to overwrite an existing key, type `n` and press Enter. If a key already exists, continue without overwriting it.
+
+Add the public key to the authorized keys file:
+
+```bash
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+```
+
+Set the required permissions:
+
+```bash
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Test the connection:
+
+```bash
+ssh localhost
+```
+
+If a first-time connection prompt asks whether to continue connecting, type:
+
+```text
+yes
+```
+
+After connecting, exit the SSH session:
+
+```bash
+exit
+```
+
+### Explanation
+
+Hadoop uses SSH to start its services on the local machine.
+
+Ideally, `ssh localhost` should connect without asking for your Ubuntu account password.
+
+---
+
+## STEP 9: FORMAT THE NAMENODE
+
+**This step is required only when initializing a new HDFS storage directory.**
+
+Command:
+
+```bash
+hdfs namenode -format
+```
+
+### Expected result
+
+The output should contain a message similar to:
+
+```text
+Storage directory .../dfs/name has been successfully formatted.
+```
+
+### Important warning
+
+The NameNode formatting step has already succeeded in your current setup.
+
+**Do not run this command again during normal startup or when executing WordCount.** Formatting again can make previously stored HDFS data inaccessible.
+
+---
+
+## STEP 10: START HADOOP HDFS
+
+Start SSH:
+
+```bash
+sudo service ssh start
+```
+
+Start HDFS:
+
+```bash
+start-dfs.sh
+```
+
+Check running Java processes:
+
+```bash
+jps
+```
+
+### Expected processes
+
+```text
+NameNode
+DataNode
+SecondaryNameNode
+Jps
+```
+
+The process IDs will differ from computer to computer.
+
+### Explanation
+
+* **NameNode:** Maintains HDFS file system metadata.
+* **DataNode:** Stores the actual HDFS data blocks.
+* **SecondaryNameNode:** Periodically assists with NameNode checkpointing.
+* **Jps:** Displays running Java processes.
+
+If only `Jps` appears, HDFS has not started successfully. Read the error messages from `start-dfs.sh` before continuing.
+
+### Open the Hadoop web interface
+
+Open this address in your Windows web browser:
+
+```text
+http://localhost:9870
+```
+
+This interface displays information about HDFS and its storage.
+
+---
+
+## STEP 11: CREATE AN INPUT DIRECTORY IN HDFS
+
+Create the input directory:
+
+```bash
+hdfs dfs -mkdir -p /user/$USER/input
+```
+
+Check the directory:
+
+```bash
+hdfs dfs -ls /user/$USER
+```
+
+### Explanation
+
+* `hdfs dfs` runs commands on HDFS.
+* `-mkdir -p` creates the directory and any missing parent directories.
+* `$USER` expands to your Ubuntu username.
+
+Remember that this directory is in HDFS, not your normal Ubuntu home directory.
+
+---
+
+## STEP 12: CREATE THE INPUT TEXT FILE
+
+Create a sample text file:
+
+```bash
+cat > ~/wordcount.txt <<'EOF'
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+EOF
+```
+
+Display the file contents:
+
+```bash
+cat ~/wordcount.txt
+```
+
+### Expected contents
+
+```text
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+```
+
+### Explanation
+
+The `cat` command with the redirection operator `>` creates a text file.
+
+The opening `EOF` and closing `EOF` must be typed exactly as shown. The closing `EOF` must appear alone on its line.
+
+---
+
+## STEP 13: UPLOAD THE INPUT FILE TO HDFS
+
+Upload the file:
+
+```bash
+hdfs dfs -put ~/wordcount.txt /user/$USER/input/
+```
+
+Check the uploaded file:
+
+```bash
+hdfs dfs -ls /user/$USER/input
+```
+
+Read the file from HDFS:
+
+```bash
+hdfs dfs -cat /user/$USER/input/wordcount.txt
+```
+
+### Explanation
+
+The `-put` command copies a file from the local Ubuntu file system into HDFS.
+
+---
+
+## STEP 14: EXECUTE THE WORDCOUNT PROGRAM
+
+Run the built-in Hadoop MapReduce example:
+
+```bash
+hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar wordcount /user/$USER/input /user/$USER/output
+```
+
+### Explanation
+
+The command contains the following parts:
+
+* `hadoop jar`: Executes a Java archive using Hadoop.
+* `hadoop-mapreduce-examples-3.5.0.jar`: Contains example MapReduce programs.
+* `wordcount`: Specifies the WordCount program.
+* `/user/$USER/input`: The HDFS directory containing the input file.
+* `/user/$USER/output`: The HDFS directory where results will be stored.
+
+The output directory must not already exist when the job starts.
+
+---
+
+## STEP 15: DISPLAY THE WORDCOUNT RESULTS
+
+Run:
+
+```bash
+hdfs dfs -cat /user/$USER/output/part-r-00000
+```
+
+### Expected output
+
+```text
+hadoop  2
+hello   3
+is      1
+linux   1
+useful  1
+world   1
+```
+
+The order of the words may vary.
+
+### Explanation
+
+The WordCount program counts how many times each word occurs in the input text.
+
+For example:
+
+* `hello` occurs 3 times.
+* `hadoop` occurs 2 times.
+* `linux` occurs 1 time.
+
+If the results appear as expected, the Hadoop WordCount program has executed successfully.
+
+---
+
+## STEP 16: EXECUTE WORDCOUNT AGAIN
+
+If you run the same WordCount command again, Hadoop may report that the output directory already exists.
+
+Remove the previous output directory:
+
+```bash
+hdfs dfs -rm -r /user/$USER/output
+```
+
+Run WordCount again:
+
+```bash
+hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar wordcount /user/$USER/input /user/$USER/output
+```
+
+Display the results:
+
+```bash
+hdfs dfs -cat /user/$USER/output/part-r-00000
+```
+
+Do not remove the input directory unless you also intend to delete the input files.
+
+---
+
+## STEP 17: STOP HADOOP
+
+When finished, stop HDFS:
+
+```bash
+stop-dfs.sh
+```
+
+Check the Java processes:
+
+```bash
+jps
+```
+
+### Explanation
+
+Stopping HDFS shuts down the Hadoop file system services.
+
+For your next session, start SSH and run `start-dfs.sh` again. Do not format the NameNode again.
+
+---
+
+## QUICK START FOR FUTURE SESSIONS
+
+After the installation and configuration are complete, use these commands to start Hadoop:
+
+```bash
+sudo service ssh start
+start-dfs.sh
+jps
+```
+
+Open the HDFS web interface:
+
+```text
+http://localhost:9870
+```
+
+View the previously generated WordCount results:
+
+```bash
+hdfs dfs -cat /user/$USER/output/part-r-00000
+```
+
+Stop Hadoop when finished:
+
+```bash
+stop-dfs.sh
+```
+
+---
+
+## TROUBLESHOOTING
+
+### 1. Error: `hadoop: command not found`
+
+Run:
+
+```bash
+source ~/.bashrc
+hadoop version
+```
+
+If the error continues, check that the environment variables were added correctly.
+
+### 2. SSH connection errors
+
+Run:
+
+```bash
+sudo service ssh start
+ssh localhost
+```
+
+If SSH requests your account password on every connection, fix the SSH configuration before starting Hadoop.
+
+### 3. NameNode or DataNode does not appear in `jps`
+
+Check Java:
+
+```bash
+java -version
+```
+
+Check the Hadoop Java configuration:
+
+```bash
+grep JAVA_HOME $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+```
+
+Check the Hadoop logs directory:
+
+```bash
+ls $HADOOP_HOME/logs
+```
+
+Read the errors printed when you run:
+
+```bash
+start-dfs.sh
+```
+
+### 4. Error: output directory already exists
+
+Run:
+
+```bash
+hdfs dfs -rm -r /user/$USER/output
+```
+
+Then execute the WordCount command again.
+
+### 5. Hadoop download fails
+
+Try the alternative download URL in Step 3. If neither URL works, check the current download links on the official Apache Hadoop website.
+
+---
+
+## RESULT
+
+Hadoop 3.5.0 was installed and configured in Ubuntu WSL. HDFS was started, an input text file was uploaded, and the built-in MapReduce WordCount program was executed to count the occurrences of words.
+
+**End of guide.**

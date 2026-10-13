@@ -1,0 +1,353 @@
+# APACHE SPARK INSTALLATION AND WORDCOUNT EXECUTION USING UBUNTU WSL
+
+## 1. AIM
+
+To install Apache Spark in Ubuntu using WSL, configure the required environment variables, and execute the WordCount program using PySpark.
+
+## 2. SOFTWARE REQUIREMENTS
+
+* Windows with WSL installed
+* Ubuntu 26.04
+* Java 17
+* Apache Spark 3.5.7
+* Python 3.12
+* Internet connection for downloading packages
+
+## 3. CHECK JAVA INSTALLATION
+
+Check the installed Java version:
+
+```bash
+java -version
+```
+
+Expected: Java 17.
+
+Check the Java compiler/runtime environment variable:
+
+```bash
+echo $JAVA_HOME
+```
+
+Set JAVA_HOME for the current terminal if required:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+## 4. INSTALL REQUIRED PACKAGES
+
+Update the Ubuntu package list:
+
+```bash
+sudo apt update
+```
+
+Install curl:
+
+```bash
+sudo apt install curl -y
+```
+
+## 5. INSTALL UV
+
+Download and install uv, which can install Python versions independently of Ubuntu's system Python.
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Load uv into the current terminal:
+
+```bash
+source "$HOME/.local/bin/env"
+```
+
+Verify the installation:
+
+```bash
+uv --version
+```
+
+## 6. INSTALL PYTHON 3.12
+
+Install Python 3.12:
+
+```bash
+uv python install 3.12
+```
+
+Find the installed Python interpreter:
+
+```bash
+uv python find 3.12
+```
+
+Expected path format:
+
+```text
+/home/pooja/.local/share/uv/python/cpython-3.12-linux-x86_64-gnu/bin/python3.12
+```
+
+Check the Python version:
+
+```bash
+"$(uv python find 3.12)" --version
+```
+
+Expected output:
+
+```text
+Python 3.12.15
+```
+
+## 7. DOWNLOAD APACHE SPARK
+
+Download Apache Spark 3.5.7 with Hadoop 3 support:
+
+```bash
+cd ~
+```
+
+```bash
+curl -fL -O https://archive.apache.org/dist/spark/spark-3.5.7/spark-3.5.7-bin-hadoop3.tgz
+```
+
+Extract the downloaded archive:
+
+```bash
+tar -xzf spark-3.5.7-bin-hadoop3.tgz
+```
+
+Move Spark into the /usr/local directory:
+
+```bash
+sudo mv spark-3.5.7-bin-hadoop3 /usr/local/spark
+```
+
+Check the installation directory:
+
+```bash
+ls /usr/local/spark
+```
+
+## 8. CONFIGURE SPARK ENVIRONMENT VARIABLES
+
+Open the Bash configuration file:
+
+```bash
+nano ~/.bashrc
+```
+
+Go to the bottom of the file and add:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export SPARK_HOME=/usr/local/spark
+export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+export PYSPARK_PYTHON="$HOME/.local/share/uv/python/cpython-3.12-linux-x86_64-gnu/bin/python3.12"
+export PYSPARK_DRIVER_PYTHON="$PYSPARK_PYTHON"
+```
+
+Save and exit nano:
+
+1. Press Ctrl+O.
+2. Press Enter.
+3. Press Ctrl+X.
+
+Load the configuration:
+
+```bash
+source ~/.bashrc
+```
+
+Verify Spark:
+
+```bash
+spark-submit --version
+```
+
+Verify Python:
+
+```bash
+"$PYSPARK_PYTHON" --version
+```
+
+Note: The PYSPARK_PYTHON path above is based on the Python installation path shown in this setup. If your path differs, use the exact path returned by `uv python find 3.12`.
+
+## 9. CREATE THE INPUT TEXT FILE
+
+Create a text file containing sample words:
+
+```bash
+cat > ~/wordcount.txt <<'EOF'
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+EOF
+```
+
+Display the input file:
+
+```bash
+cat ~/wordcount.txt
+```
+
+Expected output:
+
+```text
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+```
+
+## 10. CREATE THE PYSPARK WORDCOUNT PROGRAM
+
+Create the Python program:
+
+```bash
+cat > ~/wordcount_spark.py <<'EOF'
+from pyspark import SparkContext
+import os
+
+sc = SparkContext("local[*]", "WordCount")
+
+input_path = "file://" + os.path.expanduser("~/wordcount.txt")
+
+lines = sc.textFile(input_path)
+
+words = lines.flatMap(lambda line: line.lower().split())
+
+word_counts = words.countByValue()
+
+for word in sorted(word_counts):
+    print(f"{word}\t{word_counts[word]}")
+
+sc.stop()
+EOF
+```
+
+Display the program:
+
+```bash
+cat ~/wordcount_spark.py
+```
+
+## 11. EXECUTE THE WORDCOUNT PROGRAM
+
+Run the program using Spark:
+
+```bash
+spark-submit ~/wordcount_spark.py
+```
+
+Wait until the program completes.
+
+Spark may display INFO and WARN messages in the terminal. These are startup and execution logs.
+
+## 12. EXPECTED OUTPUT
+
+The word counts should be:
+
+```text
+hadoop  2
+hello   3
+is      1
+linux   1
+useful  1
+world   1
+```
+
+The actual output may appear between Spark's log messages.
+
+## 13. UNDERSTANDING THE PROGRAM
+
+* SparkContext: Connects the Python program to Spark.
+* textFile(): Reads the input text file.
+* flatMap(): Splits each line into individual words.
+* lower(): Converts words to lowercase.
+* countByValue(): Counts occurrences of each word.
+* sorted(): Arranges the words alphabetically.
+* sc.stop(): Stops the SparkContext after execution.
+
+## 14. IMPORTANT COMMANDS FOR FUTURE EXECUTION
+
+After installation and configuration, open Ubuntu WSL and run:
+
+```bash
+source ~/.bashrc
+```
+
+Run the program:
+
+```bash
+spark-submit ~/wordcount_spark.py
+```
+
+If the Spark environment variables are already configured in `.bashrc`, there is no need to repeat the installation.
+
+## 15. TROUBLESHOOTING
+
+### A. Python serialization or RecursionError
+
+Check the Python version Spark is using:
+
+```bash
+echo "$PYSPARK_PYTHON"
+```
+
+```bash
+"$PYSPARK_PYTHON" --version
+```
+
+Confirm that Spark is using the Python 3.12 interpreter installed with uv.
+
+### B. Spark command not found
+
+Run:
+
+```bash
+source ~/.bashrc
+```
+
+Then:
+
+```bash
+spark-submit --version
+```
+
+### C. Input file not found
+
+Check:
+
+```bash
+ls -l ~/wordcount.txt
+```
+
+If necessary, recreate the input file using Section 9.
+
+### D. Java not found
+
+Run:
+
+```bash
+java -version
+```
+
+Then:
+
+```bash
+echo "$JAVA_HOME"
+```
+
+Confirm that JAVA_HOME points to the installed Java directory.
+
+## 16. RESULT
+
+Apache Spark was configured in Ubuntu WSL, and the WordCount program was prepared to count the occurrences of words in a text file using PySpark.
+
+The program's successful execution is confirmed when the expected word-frequency output is displayed in the terminal.
+
+Note: This exercise uses Spark in local mode with a local input file. It does not require Hadoop HDFS to be running.
