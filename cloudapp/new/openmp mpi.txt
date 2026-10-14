@@ -1,0 +1,623 @@
+# INSTALLATION AND EXECUTION OF MPI AND OPENMP IN WSL UBUNTU
+
+## 1. AIM
+
+To install and configure MPI and OpenMP in Ubuntu using WSL and implement parallel processing programs using C.
+
+## 2. REQUIREMENTS
+
+- Windows with WSL installed
+- Ubuntu running inside WSL
+- GCC compiler
+- OpenMPI
+- OpenMP support in GCC
+
+## 3. OPEN UBUNTU IN WSL
+
+Open Command Prompt or PowerShell in Windows and execute:
+
+```powershell
+wsl
+```
+
+All the following Linux commands must be executed inside Ubuntu.
+
+Check the Ubuntu version:
+
+```bash
+lsb_release -a
+```
+
+## 4. INSTALL REQUIRED PACKAGES
+
+Update the package list:
+
+```bash
+sudo apt update
+```
+
+Install GCC and other development tools:
+
+```bash
+sudo apt install build-essential -y
+```
+
+Install OpenMPI:
+
+```bash
+sudo apt install openmpi-bin libopenmpi-dev -y
+```
+
+Check the GCC version:
+
+```bash
+gcc --version
+```
+
+Check the MPI compiler:
+
+```bash
+mpicc --version
+```
+
+Check the MPI execution command:
+
+```bash
+mpirun --version
+```
+
+OpenMP is supported through GCC's `-fopenmp` compiler option, so a separate OpenMP installation is not required.
+
+# PART A: IMPLEMENTATION USING OPENMP
+
+## 5. OPENMP INTRODUCTION
+
+OpenMP is an API used for parallel programming in C, C++, and Fortran. It allows a program to execute work using multiple threads that share memory.
+
+Important OpenMP directives and functions:
+
+- `#pragma omp parallel` – creates a parallel region.
+- `#pragma omp parallel for` – distributes loop iterations among threads.
+- `private(variable)` – creates a separate, initially uninitialized copy for each thread.
+- `firstprivate(variable)` – creates a separate copy initialized from the original value.
+- `lastprivate(variable)` – copies the value from the last logical iteration back to the original variable.
+- `reduction(operator:variable)` – combines the values calculated by threads.
+- `#pragma omp critical` – allows only one thread at a time to execute a protected block.
+- `omp_get_thread_num()` – returns the current thread's ID.
+
+## 6. SAMPLE 1: HELLO WORLD USING OPENMP
+
+### Create the source file
+
+```bash
+mkdir -p ~/model_lab
+cd ~/model_lab
+```
+
+```bash
+cat > omp_hello.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    #pragma omp parallel
+    {
+        printf("Hello from thread %d\n",
+               omp_get_thread_num());
+    }
+
+    return 0;
+}
+EOF
+```
+
+### Compile the program
+
+```bash
+gcc -fopenmp omp_hello.c -o omp_hello
+```
+
+### Execute the program
+
+```bash
+OMP_NUM_THREADS=4 ./omp_hello
+```
+
+### Expected output
+
+```text
+Hello from thread 0
+Hello from thread 1
+Hello from thread 2
+Hello from thread 3
+```
+
+The order of the messages may vary because the threads execute concurrently.
+
+### Explanation
+
+The `parallel` directive creates a team of threads. The function `omp_get_thread_num()` returns the ID of each thread, starting from 0.
+
+The environment variable `OMP_NUM_THREADS=4` requests four threads for this parallel region.
+
+## 7. SAMPLE 2: LOOP-LEVEL PARALLELISM USING REDUCTION
+
+### Create the source file
+
+```bash
+cat > reduction.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int sum = 0;
+
+    #pragma omp parallel for reduction(+:sum)
+    for (int i = 1; i <= 100; i++) {
+        sum += i;
+    }
+
+    printf("Sum = %d\n", sum);
+
+    return 0;
+}
+EOF
+```
+
+### Compile and execute
+
+```bash
+gcc -fopenmp reduction.c -o reduction
+OMP_NUM_THREADS=4 ./reduction
+```
+
+### Expected output
+
+```text
+Sum = 5050
+```
+
+### Explanation
+
+The loop calculates the sum of numbers from 1 to 100. The `parallel for` directive distributes loop iterations among threads. The `reduction(+:sum)` clause combines their partial sums using addition.
+
+Reduction avoids the race condition that could occur if multiple threads directly updated the same shared sum.
+
+## 8. SAMPLE 3: USING PRIVATE
+
+### Create the source file
+
+```bash
+cat > private.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 10;
+
+    #pragma omp parallel num_threads(3) private(x)
+    {
+        x = omp_get_thread_num() + 1;
+
+        printf("Thread %d: x = %d\n",
+               omp_get_thread_num(), x);
+    }
+
+    printf("Outside: x = %d\n", x);
+
+    return 0;
+}
+EOF
+```
+
+### Compile and execute
+
+```bash
+gcc -fopenmp private.c -o private
+./private
+```
+
+### Expected output
+
+```text
+Thread 0: x = 1
+Thread 1: x = 2
+Thread 2: x = 3
+Outside: x = 10
+```
+
+The order of the thread messages may vary.
+
+### Explanation
+
+The `private(x)` clause gives each thread its own separate copy of `x`. The private copies are initially uninitialized, so each thread assigns a value before using them.
+
+The original variable remains unchanged at 10.
+
+## 9. SAMPLE 4: USING FIRSTPRIVATE
+
+### Create the source file
+
+```bash
+cat > firstprivate.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 10;
+
+    #pragma omp parallel num_threads(3) firstprivate(x)
+    {
+        x = x + omp_get_thread_num();
+
+        printf("Thread %d: x = %d\n",
+               omp_get_thread_num(), x);
+    }
+
+    printf("Outside: x = %d\n", x);
+
+    return 0;
+}
+EOF
+```
+
+### Compile and execute
+
+```bash
+gcc -fopenmp firstprivate.c -o firstprivate
+./firstprivate
+```
+
+### Expected output
+
+```text
+Thread 0: x = 10
+Thread 1: x = 11
+Thread 2: x = 12
+Outside: x = 10
+```
+
+The order of the thread messages may vary.
+
+### Explanation
+
+The `firstprivate(x)` clause gives each thread a separate copy initialized with the original value, 10. Each thread modifies its own copy. The original value remains unchanged.
+
+## 10. SAMPLE 5: USING LASTPRIVATE
+
+### Create the source file
+
+```bash
+cat > lastprivate.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 0;
+
+    #pragma omp parallel for num_threads(3) lastprivate(x)
+    for (int i = 1; i <= 5; i++) {
+        x = i;
+        printf("i = %d, x = %d\n", i, x);
+    }
+
+    printf("Final x = %d\n", x);
+
+    return 0;
+}
+EOF
+```
+
+### Compile and execute
+
+```bash
+gcc -fopenmp lastprivate.c -o lastprivate
+./lastprivate
+```
+
+### Expected final output
+
+```text
+Final x = 5
+```
+
+The iteration messages may appear in any order.
+
+### Explanation
+
+The `lastprivate(x)` clause copies the value of `x` from the last logical loop iteration back to the original variable. Since the last iteration is `i = 5`, the final value of `x` is 5.
+
+## 11. SAMPLE 6: USING CRITICAL
+
+### Create the source file
+
+```bash
+cat > critical.c <<'EOF'
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int count = 0;
+
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp critical
+        {
+            count++;
+
+            printf("Thread %d: count = %d\n",
+                   omp_get_thread_num(), count);
+        }
+    }
+
+    printf("Final count = %d\n", count);
+
+    return 0;
+}
+EOF
+```
+
+### Compile and execute
+
+```bash
+gcc -fopenmp critical.c -o critical
+./critical
+```
+
+### Expected final output
+
+```text
+Final count = 4
+```
+
+### Explanation
+
+Four threads increment the shared variable `count`. The `critical` directive allows only one thread at a time to execute the protected block, preventing concurrent updates from interfering with one another.
+
+The final count is 4.
+
+## 12. GENERAL OPENMP COMMANDS
+
+Compile an OpenMP program:
+
+```bash
+gcc -fopenmp filename.c -o outputname
+```
+
+Execute a program with four threads:
+
+```bash
+OMP_NUM_THREADS=4 ./outputname
+```
+
+Execute a program that specifies its thread count using `num_threads(3)` in the code:
+
+```bash
+./outputname
+```
+
+List the source files:
+
+```bash
+ls
+```
+
+# PART B: IMPLEMENTATION USING MPI
+
+## 13. MPI INTRODUCTION
+
+MPI stands for Message Passing Interface. It is used to develop parallel programs in which separate processes communicate by sending and receiving messages.
+
+Important MPI functions:
+
+- `MPI_Init()` – initializes the MPI environment.
+- `MPI_Comm_rank()` – obtains the rank of the current process.
+- `MPI_Comm_size()` – obtains the number of processes.
+- `MPI_Send()` – sends a message.
+- `MPI_Recv()` – receives a message.
+- `MPI_Reduce()` – combines values from multiple processes.
+- `MPI_Finalize()` – terminates the MPI environment.
+
+## 14. SAMPLE 1: HELLO WORLD USING MPI
+
+### Create the source file
+
+```bash
+cat > mpi_hello.c <<'EOF'
+#include <stdio.h>
+#include <mpi.h>
+
+int main(int argc, char *argv[]) {
+    int rank, size;
+
+    MPI_Init(&argc, &argv);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    printf("Hello from process %d of %d\n", rank, size);
+
+    MPI_Finalize();
+
+    return 0;
+}
+EOF
+```
+
+### Compile the program
+
+```bash
+mpicc mpi_hello.c -o mpi_hello
+```
+
+### Execute using four processes
+
+```bash
+mpirun --oversubscribe -np 4 ./mpi_hello
+```
+
+### Expected output
+
+```text
+Hello from process 0 of 4
+Hello from process 1 of 4
+Hello from process 2 of 4
+Hello from process 3 of 4
+```
+
+The order of the output lines may vary.
+
+### Explanation
+
+`MPI_Init()` initializes MPI. Each process obtains its unique rank using `MPI_Comm_rank()`. The total number of processes is obtained using `MPI_Comm_size()`.
+
+The `-np 4` option requests four processes. `MPI_Finalize()` ends the MPI environment.
+
+## 15. SAMPLE 2: SUM OF VALUES USING MPI REDUCE
+
+### Create the source file
+
+```bash
+cat > mpi_sum.c <<'EOF'
+#include <stdio.h>
+#include <mpi.h>
+
+int main(int argc, char *argv[]) {
+    int rank, size;
+    int local_value;
+    int total = 0;
+
+    MPI_Init(&argc, &argv);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    local_value = rank;
+
+    MPI_Reduce(&local_value, &total, 1, MPI_INT,
+               MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        printf("Number of processes = %d\n", size);
+        printf("Sum = %d\n", total);
+    }
+
+    MPI_Finalize();
+
+    return 0;
+}
+EOF
+```
+
+### Compile the program
+
+```bash
+mpicc mpi_sum.c -o mpi_sum
+```
+
+### Execute the program
+
+```bash
+mpirun --oversubscribe -np 4 ./mpi_sum
+```
+
+### Expected output
+
+```text
+Number of processes = 4
+Sum = 6
+```
+
+### Explanation
+
+Each process uses its rank as its local value:
+
+- Process 0 contributes 0.
+- Process 1 contributes 1.
+- Process 2 contributes 2.
+- Process 3 contributes 3.
+
+`MPI_Reduce()` combines these values using `MPI_SUM` and stores the result at process 0. Therefore, the total is 0 + 1 + 2 + 3 = 6.
+
+## 16. GENERAL MPI COMMANDS
+
+Compile an MPI program:
+
+```bash
+mpicc filename.c -o outputname
+```
+
+Execute using four processes:
+
+```bash
+mpirun --oversubscribe -np 4 ./outputname
+```
+
+Execute using two processes:
+
+```bash
+mpirun --oversubscribe -np 2 ./outputname
+```
+
+Check the MPI compiler:
+
+```bash
+mpicc --version
+```
+
+Check the MPI runtime:
+
+```bash
+mpirun --version
+```
+
+# 17. DIFFERENCE BETWEEN MPI AND OPENMP
+
+| MPI | OpenMP |
+|---|---|
+| Uses multiple processes. | Uses multiple threads. |
+| Processes communicate through messages. | Threads share memory. |
+| Uses functions such as `MPI_Init()` and `MPI_Finalize()`. | Uses directives such as `#pragma omp parallel`. |
+| Compiled using `mpicc`. | Compiled using `gcc -fopenmp`. |
+| Executed using `mpirun`. | Executed as a normal executable. |
+
+# 18. TROUBLESHOOTING
+
+### Error: gcc command not found
+
+```bash
+sudo apt update
+sudo apt install build-essential -y
+```
+
+### Error: mpicc command not found
+
+```bash
+sudo apt install openmpi-bin libopenmpi-dev -y
+```
+
+### Error: omp.h not found
+
+```bash
+sudo apt install build-essential -y
+```
+
+Compile OpenMP programs using the `-fopenmp` option.
+
+### Error: Permission denied while running MPI
+
+For a local WSL installation, try:
+
+```bash
+mpirun --oversubscribe -np 4 ./mpi_hello
+```
+
+If MPI reports that it cannot run as root, do not bypass that restriction blindly. Run the command as your normal Ubuntu user.
+
+### Error: Output directory or file already exists
+
+For these examples, compile again using the corresponding compile command. For MPI and OpenMP, the output executable is overwritten when GCC or `mpicc` compiles successfully.
+
+# 19. RESULT
+
+MPI and OpenMP were installed and configured successfully in Ubuntu using WSL. The Hello World, reduction, private, firstprivate, lastprivate, and critical OpenMP programs were compiled and executed. MPI programs were compiled and executed using multiple processes, demonstrating parallel execution and reduction operations.
