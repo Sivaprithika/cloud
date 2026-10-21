@@ -351,3 +351,88 @@ Apache Spark was configured in Ubuntu WSL, and the WordCount program was prepare
 The program's successful execution is confirmed when the expected word-frequency output is displayed in the terminal.
 
 Note: This exercise uses Spark in local mode with a local input file. It does not require Hadoop HDFS to be running.
+
+
+
+
+
+1.
+set -e
+
+# 1. Install Java and required tools
+sudo apt update
+sudo apt install -y openjdk-17-jdk curl ca-certificates
+
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$HOME/.local/bin:$PATH"
+
+# 2. Install uv and Python 3.12
+if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh
+    sh /tmp/uv-install.sh
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+uv python install 3.12
+export PYSPARK_PYTHON="$(uv python find 3.12)"
+export PYSPARK_DRIVER_PYTHON="$PYSPARK_PYTHON"
+
+# 3. Download and install Spark 3.5.7
+if [ ! -x /usr/local/spark/bin/spark-submit ]; then
+    cd /tmp
+    curl -fL --retry 3 \
+      -o spark-3.5.7-bin-hadoop3.tgz \
+      https://archive.apache.org/dist/spark/spark-3.5.7/spark-3.5.7-bin-hadoop3.tgz
+
+    sudo tar -xzf spark-3.5.7-bin-hadoop3.tgz -C /usr/local
+    sudo mv /usr/local/spark-3.5.7-bin-hadoop3 /usr/local/spark
+fi
+
+export SPARK_HOME=/usr/local/spark
+export PATH="$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin"
+
+# 4. Save settings for future Ubuntu sessions
+for line in \
+  'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' \
+  'export SPARK_HOME=/usr/local/spark' \
+  'export PATH="$JAVA_HOME/bin:$HOME/.local/bin:$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"' \
+  'export PYSPARK_PYTHON="$(uv python find 3.12 2>/dev/null)"' \
+  'export PYSPARK_DRIVER_PYTHON="$PYSPARK_PYTHON"'
+do
+    grep -qxF "$line" "$HOME/.bashrc" || echo "$line" >> "$HOME/.bashrc"
+done
+
+# 5. Create the input text file
+cat > "$HOME/wordcount.txt" <<'EOF'
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+EOF
+
+# 6. Create the Spark WordCount program
+cat > "$HOME/wordcount_spark.py" <<'EOF'
+from pyspark import SparkContext
+import os
+
+sc = SparkContext("local[*]", "WordCount")
+
+input_path = "file://" + os.path.expanduser("~/wordcount.txt")
+lines = sc.textFile(input_path)
+words = lines.flatMap(lambda line: line.lower().split())
+word_counts = words.countByValue()
+
+for word in sorted(word_counts):
+    print(f"{word}\t{word_counts[word]}")
+
+sc.stop()
+EOF
+
+# 7. Check versions and run WordCount
+java -version
+"$PYSPARK_PYTHON" --version
+spark-submit --version
+spark-submit "$HOME/wordcount_spark.py"
+2.
+nano ~/wordcount.txt
+spark-submit "$HOME/wordcount_spark.py"
