@@ -661,3 +661,107 @@ Try the alternative download URL in Step 3. If neither URL works, check the curr
 Hadoop 3.5.0 was installed and configured in Ubuntu WSL. HDFS was started, an input text file was uploaded, and the built-in MapReduce WordCount program was executed to count the occurrences of words.
 
 **End of guide.**
+
+
+
+
+
+1.
+wsl --install
+wsl --install -d Ubuntu
+Step 2: Tick these two options
+
+Find and check:
+- Windows Subsystem for Linux
+- Virtual Machine Platform
+Click OK and wait for Windows to finish.
+
+2.
+sudo apt update && sudo apt install -y openjdk-17-jdk openssh-server openssh-client rsync wget &&
+if [ ! -d /usr/local/hadoop ]; then
+  cd ~ &&
+  wget https://dlcdn.apache.org/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz &&
+  sudo tar -xzf hadoop-3.5.0.tar.gz -C /usr/local/ &&
+  sudo mv /usr/local/hadoop-3.5.0 /usr/local/hadoop
+fi
+
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+echo 'export HADOOP_HOME=/usr/local/hadoop' >> ~/.bashrc
+echo 'export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop' >> ~/.bashrc
+echo 'export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin' >> ~/.bashrc
+
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export HADOOP_HOME=/usr/local/hadoop
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+sudo chown -R "$USER":"$USER" "$HADOOP_HOME"
+mkdir -p "$HADOOP_HOME/logs"
+
+sed -i '/^export JAVA_HOME=/d' "$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> "$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
+
+cat > "$HADOOP_HOME/etc/hadoop/core-site.xml" <<'EOF'
+<?xml version="1.0"?>
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://localhost:9000</value>
+  </property>
+</configuration>
+EOF
+
+cat > "$HADOOP_HOME/etc/hadoop/hdfs-site.xml" <<'EOF'
+<?xml version="1.0"?>
+<configuration>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+</configuration>
+EOF
+
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+[ -f ~/.ssh/id_rsa ] || ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa
+touch ~/.ssh/authorized_keys
+grep -qxF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys || cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+sudo service ssh start
+
+3.
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export HADOOP_HOME=/usr/local/hadoop
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+sudo service ssh start
+start-dfs.sh
+
+sleep 3
+hdfs dfs -mkdir -p /user/$USER/input
+
+cat > ~/wordcount.txt <<'EOF'
+hello hadoop
+hello linux
+hadoop is useful
+hello world
+EOF
+
+hdfs dfs -put -f ~/wordcount.txt /user/$USER/input/
+hdfs dfs -rm -r -f /user/$USER/output
+
+hadoop jar "$HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar" wordcount /user/$USER/input /user/$USER/output
+
+echo "===== WORDCOUNT RESULT ====="
+hdfs dfs -cat /user/$USER/output/part-r-00000
+
+4.
+nano ~/wordcount.txt
+hdfs dfs -put -f ~/wordcount.txt /user/$USER/input/
+hdfs dfs -rm -r -f /user/$USER/output
+
+hadoop jar "$HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar" wordcount /user/$USER/input /user/$USER/output
+
+echo "===== UPDATED WORDCOUNT RESULT ====="
+hdfs dfs -cat /user/$USER/output/part-r-00000
