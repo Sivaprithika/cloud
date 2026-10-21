@@ -670,7 +670,7 @@ Hadoop 3.5.0 was installed and configured in Ubuntu WSL. HDFS was started, an in
 wsl --install
 wsl --install -d Ubuntu
 Step 2: Tick these two options
-
+optionalfeatures
 Find and check:
 - Windows Subsystem for Linux
 - Virtual Machine Platform
